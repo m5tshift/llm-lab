@@ -1,0 +1,11 @@
+# Only runtime sources and dependency manifests enter the build context.
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!src/
+!src/**
+!samples/
+!samples/**
+**/__pycache__/
+**/*.pyc

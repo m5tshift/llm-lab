@@ -1,0 +1,166 @@
+services:
+  web:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    ports:
+      - "${GRADIO_PORT:-7860}:7860"
+      - "${WEB_METRICS_PORT:-8001}:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - GRADIO_SERVER_NAME=${GRADIO_SERVER_NAME:-0.0.0.0}
+      - GRADIO_SERVER_PORT=${GRADIO_PORT:-7860}
+      - WEB_METRICS_PORT=${WEB_METRICS_PORT:-8001}
+      - METRICS_PORT=${WEB_METRICS_PORT:-8001}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
+      - VISION_BACKEND=${VISION_BACKEND:-ollama}
+      - OLLAMA_CONTEXT=${OLLAMA_CONTEXT:-4096}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
+      - WHISPER_MODEL=${WHISPER_MODEL:-openai/whisper-small}
+      - NLP_MODEL=${NLP_MODEL:-cointegrated/rubert-tiny2-cedr-emotion-detection}
+      - IMAGE_MODEL=${IMAGE_MODEL:-Salesforce/blip-image-captioning-large}
+      - VLM_MODEL=${VLM_MODEL:-Qwen/Qwen2-VL-2B-Instruct}
+      - YOLO_MODEL=${YOLO_MODEL:-yolo26s.pt}
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=${API_PORT:-8000}
+      - DEFAULT_TWITCH_CHANNEL=${DEFAULT_TWITCH_CHANNEL:-}
+    volumes:
+      - ./src:/app/src
+      - ./samples:/app/samples:ro
+      - hf_cache:/home/appuser/.cache/huggingface
+      - torch_cache:/home/appuser/.cache/torch
+      - ultralytics_cache:/home/appuser/.config/Ultralytics
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    command: ["python", "-m", "src.web_ui"]
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=${API_PORT:-8000}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
+      - VISION_BACKEND=${VISION_BACKEND:-ollama}
+      - OLLAMA_CONTEXT=${OLLAMA_CONTEXT:-4096}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
+      - WHISPER_MODEL=${WHISPER_MODEL:-openai/whisper-small}
+      - NLP_MODEL=${NLP_MODEL:-cointegrated/rubert-tiny2-cedr-emotion-detection}
+      - IMAGE_MODEL=${IMAGE_MODEL:-Salesforce/blip-image-captioning-large}
+      - VLM_MODEL=${VLM_MODEL:-Qwen/Qwen2-VL-2B-Instruct}
+      - YOLO_MODEL=${YOLO_MODEL:-yolo26s.pt}
+      - DEFAULT_TWITCH_CHANNEL=${DEFAULT_TWITCH_CHANNEL:-}
+    volumes:
+      - ./src:/app/src
+      - ./samples:/app/samples:ro
+      - hf_cache:/home/appuser/.cache/huggingface
+      - torch_cache:/home/appuser/.cache/torch
+      - ultralytics_cache:/home/appuser/.config/Ultralytics
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    profiles:
+      - internal-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ollama-model-pull:
+    image: curlimages/curl:8.12.1
+    restart: "no"
+    profiles:
+      - pull-model
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "curl -s -X POST http://ollama:11434/api/pull -d '{\"model\": \"${OLLAMA_MODEL:-qwen3.5:9b}\", \"stream\": false}' && echo 'Model pulled successfully'"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:12.4.5
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  hf_cache:
+    name: twitch_bot_hf_cache
+  torch_cache:
+    name: twitch_bot_torch_cache
+  ultralytics_cache:
+    name: twitch_bot_ultralytics_cache
+  ollama_data:
+    name: twitch_bot_ollama_data
+  prometheus_data:
+    name: twitch_bot_prometheus_data
+  grafana_data:
+    name: twitch_bot_grafana_data
