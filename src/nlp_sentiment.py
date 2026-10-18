@@ -2,7 +2,7 @@
 
 Framework: Hugging Face (transformers)
 Task: Natural Language Processing / Emotion Detection & Sentiment Analysis
-Model: RuBERT-Tiny2 CEDR Emotion (cointegrated/rubert-tiny2-cedr-emotion-detection, 29.3M params, 6 emotions)
+Model: cointegrated/rubert-tiny2-cedr-emotion-detection (five emotions + no_emotion)
 """
 
 import time

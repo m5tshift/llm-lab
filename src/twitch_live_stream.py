@@ -44,7 +44,7 @@ def main():
         "--vlm-interval",
         type=int,
         default=20,
-        help="Interval between background Qwen2-VL analyses in seconds",
+        help="Minimum interval between background analyses with the configured vision backend",
     )
     parser.add_argument(
         "--no-display", action="store_true", help="Disable GUI video display window (headless mode)"

@@ -1,8 +1,8 @@
 """Module 4: Video Processing - Real-time Live Stream & Object Detection.
 
 Framework: Ultralytics YOLO (PyTorch) + OpenCV
-Task: Real-time Object Detection & Tracking in Video / Live Stream
-Model: Ultralytics YOLO26 Small (yolo26s.pt, 9.5M params, mAP50-95: 48.6%)
+Task: Per-frame object detection in video or a live feed (no object tracking)
+Default model: Ultralytics YOLO26 Small (yolo26s.pt)
 """
 
 import time

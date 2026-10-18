@@ -1,4 +1,4 @@
-"""API Service: FastAPI Web Interface for Twitch Multimodal Models.
+"""API Service: FastAPI interface for experiments with pretrained models.
 
 Provides REST endpoints for text sentiment, image classification,
 object detection, and LLM reactions.
@@ -37,8 +37,13 @@ from src.metrics import (
 )
 
 app = FastAPI(
-    title="ai lab",
-    description="REST API для инференса моделей мультимодального анализа трансляций",
+    title="llm-lab",
+    description=(
+        "API для изучения возможностей готовых моделей: анализ тональности текста, "
+        "описание изображений, вопросы о кадре и детекция объектов. "
+        "Дополнительно доступна генерация реакции LLM по объединённому контексту. "
+        "Метрики доступны в /metrics."
+    ),
     version="1.0.0",
 )
 
@@ -72,7 +77,7 @@ async def prometheus_metrics_middleware(request: Request, call_next):
             )
 
 
-# Lazy loading of model instances
+# Model references populated at startup; vlm_model is initialized on first request.
 nlp_model: Optional[ChatSentimentAnalyzer] = None
 image_model: Optional[StreamImageClassifier] = None
 vlm_model: Optional[StreamImageClassifier] = None
@@ -88,7 +93,7 @@ def startup_event():
     image_model = create_vision_classifier()
     video_model = LiveStreamVideoDetector()
     llm_model = LocalLLMBrain()
-    print("[API] All models loaded and ready.")
+    print("[API] Model instances initialized; Ollama inference is requested separately.")
 
 
 class ChatBatchRequest(BaseModel):
@@ -109,7 +114,7 @@ class ReactionRequest(BaseModel):
 
 @app.get("/metrics")
 def get_metrics():
-    """Prometheus exposition metrics endpoint for Grafana and Prometheus scraping."""
+    """Expose process metrics for Prometheus; Grafana visualizes the collected data."""
     return Response(content=get_latest_metrics(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -132,7 +137,7 @@ def root():
 
 @app.post("/api/text/sentiment", response_model=SingleSentimentResult)
 def analyze_single_chat(req: SingleChatRequest):
-    """Analyze sentiment for a single Twitch chat message."""
+    """Analyze sentiment for a single message."""
     if not nlp_model:
         raise HTTPException(status_code=503, detail="NLP model not initialized")
     res = nlp_model.analyze_message(req.text)
@@ -156,7 +161,7 @@ def analyze_chat_batch(req: ChatBatchRequest):
 
 @app.post("/api/image/classify", response_model=ImageClassificationResult)
 async def classify_stream_image(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
-    """Classify an uploaded stream screenshot or camera frame using Vision backbone."""
+    """Analyze an uploaded image with the configured vision backend and optional prompt."""
     if not image_model:
         raise HTTPException(status_code=503, detail="Image model not initialized")
 
@@ -180,7 +185,7 @@ async def vlm_analyze_image(
     file: UploadFile = File(...),
     prompt: Optional[str] = Form(None),
 ):
-    """Deep Vision-Language Model analysis of stream scene, game HUD, and OCR."""
+    """Ask the configured vision model about a frame, including scene or interface text."""
     global vlm_model
     if vlm_model is None:
         try:
@@ -210,7 +215,7 @@ async def vlm_analyze_image(
 
 @app.post("/api/video/detect-frame")
 async def detect_frame_objects(file: UploadFile = File(...)):
-    """Detect objects in a single video frame using YOLOv8."""
+    """Detect objects in a single image using the configured YOLO model."""
     if not video_model:
         raise HTTPException(status_code=503, detail="Video model not initialized")
 
@@ -239,7 +244,7 @@ async def detect_frame_objects(file: UploadFile = File(...)):
 
 @app.post("/api/llm/generate-reaction", response_model=LLMReplyResult)
 def generate_bot_reaction(req: ReactionRequest):
-    """Generate a contextual Twitch chat response using the local LLM brain."""
+    """Generate a reaction from speech, message sentiment, and visual context using the local LLM."""
     if not llm_model:
         raise HTTPException(status_code=503, detail="LLM model not initialized")
     try:

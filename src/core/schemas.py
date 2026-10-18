@@ -108,7 +108,7 @@ class DetectedObject(SubscriptableModel):
 
 
 class VideoDetectionResult(SubscriptableModel):
-    """Frame object detection result from YOLOv8."""
+    """Frame object detection result from the configured YOLO model."""
 
     detected_objects: List[DetectedObject] = Field(default_factory=list)
     annotated_frame: Any = None

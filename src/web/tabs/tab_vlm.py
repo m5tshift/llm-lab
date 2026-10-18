@@ -1,4 +1,4 @@
-"""Tab 4: Vision-Language Model (VLM & OCR) — настроенной VLM."""
+"""Tab 4: Image analysis with the configured vision-language model."""
 
 import time
 import os
@@ -15,7 +15,7 @@ SAMPLE_IMAGE_PATH = os.path.join("samples", "sample_stream.jpg")
 
 
 def handle_vlm_analyze(image, prompt_text):
-    """Processes image with настроенной VLM multimodal model."""
+    """Processes an image with the configured vision-language model."""
     if image is None:
         return (
             "Изображение не загружено. Пожалуйста, загрузите скриншот или используйте пример.",
@@ -69,9 +69,9 @@ def create_vlm_tab():
     with gr.TabItem("4. Зрение (VLM & OCR)"):
         gr.Markdown("### 4. Мультимодальный визуально-языковой анализ (VLM & OCR)")
         gr.Markdown(
-            "**Архитектура:** общая мультимодальная модель для изображения и диалога.\n\n"
+            "**По умолчанию:** общая модель Ollama для изображения и диалога. При VISION_BACKEND=transformers анализ кадра выполняет отдельная VLM.\n\n"
             "**Стек по умолчанию:** локальный Ollama, Qwen3.5 9B. Задержка измеряется при запросе.\n\n"
-            "**Возможности:** семантический разбор кадра, чтение HUD (HP, патроны, радар, таймер), счет матча и русский OCR игрового интерфейса."
+            "**Эксперимент:** задайте вопрос о сцене, счёте матча или тексте интерфейса и сверьте ответ с кадром."
         )
 
         with gr.Row():
@@ -102,14 +102,14 @@ def create_vlm_tab():
                     placeholder="Здесь появляется описание кадра, элементов интерфейса и распознанный текст",
                 )
                 with gr.Row():
-                    out_latency = gr.Textbox(label="Время инференса (CPU Latency)", scale=1)
+                    out_latency = gr.Textbox(label="Время запроса", scale=1)
                     out_model = gr.Textbox(label="Модель и архитектура", scale=2)
 
                 gr.Markdown(
-                    "**Особенности архитектуры:**\n"
-                    "- Поддержка произвольного соотношения сторон с динамическим разрешением;\n"
-                    "- Прямая обработка визуальных токенов через Vision Transformer (ViT) и кросс-внимание;\n"
-                    "- Высокая точность оптического распознавания (OCR) русскоязычного и англоязычного текста интерфейса."
+                    "**Что проверить:**\n"
+                    "- Соответствует ли описание видимым объектам и событиям;\n"
+                    "- Верно ли прочитаны мелкий текст и числа интерфейса;\n"
+                    "- Не добавляет ли модель детали, отсутствующие на кадре. Обработка изображения зависит от выбранного backend."
                 )
 
         # Load an example image

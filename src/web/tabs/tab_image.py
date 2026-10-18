@@ -53,9 +53,9 @@ def create_image_tab():
     with gr.TabItem("3. Сравнение: BLIP Large"):
         gr.Markdown("### 3. Описание изображения (Image-to-Text Captioning)")
         gr.Markdown(
-            "**Архитектура:** `Salesforce/blip-image-captioning-large` (446M параметров, ViT-L/14 + Text Decoder)\n\n"
-            "**Стек:** Hugging Face Transformers, PyTorch | **Среда:** CPU (Docker) | **Задержка:** ~2.40 с | **Метрика:** CIDEr 144.5\n\n"
-            "Экспериментальная модель предыдущего этапа. Загружается только при ручном запросе; текущий живой режим использует общую модель Ollama."
+            "**Модель:** `Salesforce/blip-image-captioning-large` — описание изображения текстом.\n\n"
+            "**Инструменты:** Hugging Face Transformers, PyTorch. Время запроса показано рядом с результатом. Сравните описание с ответом VLM на том же кадре.\n\n"
+            "При стандартном VISION_BACKEND=ollama BLIP загружается по ручному запросу. В режиме transformers модель IMAGE_MODEL также загружается при запуске Gradio; эта вкладка всегда использует BLIP Large."
         )
 
         with gr.Row():

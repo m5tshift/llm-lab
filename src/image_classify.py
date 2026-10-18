@@ -179,6 +179,7 @@ class StreamImageClassifier(BaseImageClassifier):
         if self.is_vlm or self.is_caption_model:
             caption = self.describe_image(img, prompt=prompt, max_new_tokens=max_new_tokens)
             latency_ms = (time.perf_counter() - start) * 1000
+            # Legacy placeholder scores, not probabilities of caption correctness.
             conf = 0.98 if self.is_vlm else 0.96
 
             prediction_item = ClassificationItem(

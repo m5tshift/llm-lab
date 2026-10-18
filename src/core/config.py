@@ -35,7 +35,7 @@ class ModelSettings(BaseModel):
     )
     vlm_model: str = Field(
         default_factory=lambda: os.getenv("VLM_MODEL", "Qwen/Qwen2-VL-2B-Instruct"),
-        description="Vision-Language Model (VLM) for deep scene reasoning, UI, and Russian OCR",
+        description="Vision-language checkpoint used when VISION_BACKEND=transformers",
     )
     yolo_model: str = Field(
         default_factory=lambda: os.getenv("YOLO_MODEL", "yolo26s.pt"),

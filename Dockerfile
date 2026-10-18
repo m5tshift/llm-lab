@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
 
-# --- Stage 2: Production runtime stage ---
+# --- Stage 2: Application runtime stage ---
 FROM python:3.11-slim AS runtime
 
 # Install system runtime libraries required by OpenCV, PyTorch, Whisper/Librosa and health checks
