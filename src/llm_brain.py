@@ -1,6 +1,6 @@
 """Module 5: LLM Decision Engine / Bot Brain.
 
-Connects to local Ollama (Qwen 3 8B) for contextual chat responses.
+Connects to local Ollama (Qwen3.5 9B by default) for contextual chat responses.
 Provides stream Q&A and multimodal synthesis via direct Ollama REST API.
 """
 
@@ -35,6 +35,8 @@ class LocalLLMBrain(BaseLLMBrain):
         self.ollama_base_url = (ollama_base_url or settings.models.ollama_base_url).rstrip("/")
         self.model_name = model_name or settings.models.ollama_model
         self.timeout = settings.models.ollama_timeout
+        # Startup probe for the log only: requests are always attempted, so an Ollama server
+        # started after the application is picked up without a restart.
         self.is_ollama_available = self._check_health()
 
         if self.is_ollama_available:
@@ -43,6 +45,30 @@ class LocalLLMBrain(BaseLLMBrain):
             )
         else:
             print(f"[LLM] Warning: Ollama not reachable at {self.ollama_base_url}.")
+
+    def _options(self, **options) -> Dict[str, Any]:
+        """Generation options shared by all requests; a fixed seed makes evaluation repeatable."""
+        options["num_ctx"] = settings.models.ollama_context
+        if settings.models.ollama_seed is not None:
+            options["seed"] = settings.models.ollama_seed
+        return options
+
+    def _to_result(self, reply: str, data: Dict[str, Any], start: float) -> LLMReplyResult:
+        """Builds the reply with token counts and the timings Ollama reports (nanoseconds)."""
+        prompt_tokens = data.get("prompt_eval_count", 0)
+        output_tokens = data.get("eval_count", 0)
+        eval_ns = data.get("eval_duration", 0)
+        return LLMReplyResult(
+            reply=reply,
+            engine=f"Ollama ({self.model_name})",
+            latency_ms=round((time.perf_counter() - start) * 1000, 2),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=output_tokens,
+            total_tokens=prompt_tokens + output_tokens,
+            speed_tps=round(output_tokens / (eval_ns / 1e9), 1) if eval_ns > 0 else 0.0,
+            load_ms=round(data.get("load_duration", 0) / 1e6, 2),
+            prompt_eval_ms=round(data.get("prompt_eval_duration", 0) / 1e6, 2),
+        )
 
     def _check_health(self) -> bool:
         """Pings Ollama endpoint."""
@@ -54,8 +80,6 @@ class LocalLLMBrain(BaseLLMBrain):
 
     def chat(self, messages: List[Dict[str, str]]) -> LLMReplyResult:
         """Send a standalone conversation without adding a persona or stream context."""
-        if not self.is_ollama_available:
-            raise RuntimeError(f"Ollama server is not reachable at {self.ollama_base_url}")
         start = time.perf_counter()
         data = generate(
             self.ollama_base_url,
@@ -65,29 +89,14 @@ class LocalLLMBrain(BaseLLMBrain):
                 "stream": False,
                 "think": False,
                 "keep_alive": "30m",
-                "options": {
-                    "num_ctx": settings.models.ollama_context,
-                    "temperature": 0.8,
-                    "num_predict": 512,
-                },
+                "options": self._options(temperature=0.8, num_predict=512),
             },
             self.timeout,
         )
         reply = _clean_llm_reply(data.get("message", {}).get("content", ""))
         if not reply:
             raise RuntimeError("Ollama вернула пустой ответ")
-        input_tokens = data.get("prompt_eval_count", 0)
-        output_tokens = data.get("eval_count", 0)
-        duration_ns = data.get("eval_duration", 0)
-        return LLMReplyResult(
-            reply=reply,
-            engine=f"Ollama ({self.model_name})",
-            latency_ms=round((time.perf_counter() - start) * 1000, 2),
-            prompt_tokens=input_tokens,
-            completion_tokens=output_tokens,
-            total_tokens=input_tokens + output_tokens,
-            speed_tps=round(output_tokens / (duration_ns / 1e9), 1) if duration_ns > 0 else 0,
-        )
+        return self._to_result(reply, data, start)
 
     def generate_reply(
         self,
@@ -170,40 +179,16 @@ class LocalLLMBrain(BaseLLMBrain):
             if not prompt.strip():
                 raise ValueError("Введите запрос к модели")
 
-        if not self.is_ollama_available:
-            raise RuntimeError(f"Ollama server is not reachable at {self.ollama_base_url}")
-
         payload = {
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
             "think": False,
             "keep_alive": "30m",
-            "options": {
-                "num_ctx": settings.models.ollama_context,
-                "temperature": 0.8,
-                "top_p": 0.9,
-                "num_predict": 60,
-            },
+            "options": self._options(temperature=0.8, top_p=0.9, num_predict=60),
         }
         data = generate(self.ollama_base_url, payload, self.timeout)
-        raw_reply = data.get("response", "")
-        reply = _clean_llm_reply(raw_reply)
-        total_duration = (time.perf_counter() - start) * 1000
-        prompt_eval_count = data.get("prompt_eval_count", 0)
-        eval_count = data.get("eval_count", 0)
-        eval_duration_ns = data.get("eval_duration", 0)
-        speed_tps = round(eval_count / (eval_duration_ns / 1e9), 1) if eval_duration_ns > 0 else 0.0
-
-        return LLMReplyResult(
-            reply=reply,
-            engine=f"Ollama ({self.model_name})",
-            latency_ms=round(total_duration, 2),
-            prompt_tokens=prompt_eval_count,
-            completion_tokens=eval_count,
-            total_tokens=prompt_eval_count + eval_count,
-            speed_tps=speed_tps,
-        )
+        return self._to_result(_clean_llm_reply(data.get("response", "")), data, start)
 
     def answer_stream_question(
         self,
@@ -337,36 +322,13 @@ class LocalLLMBrain(BaseLLMBrain):
 
         start = time.perf_counter()
 
-        if not self.is_ollama_available:
-            raise RuntimeError(f"Ollama server is not reachable at {self.ollama_base_url}")
-
         payload = {
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
             "think": False,
             "keep_alive": "30m",
-            "options": {
-                "num_ctx": settings.models.ollama_context,
-                "temperature": 0.7,
-                "num_predict": 150,
-            },
+            "options": self._options(temperature=0.7, num_predict=150),
         }
         data = generate(self.ollama_base_url, payload, self.timeout)
-        raw_reply = data.get("response", "")
-        reply = _clean_llm_reply(raw_reply)
-        total_duration = (time.perf_counter() - start) * 1000
-        prompt_eval_count = data.get("prompt_eval_count", 0)
-        eval_count = data.get("eval_count", 0)
-        eval_duration_ns = data.get("eval_duration", 0)
-        speed_tps = round(eval_count / (eval_duration_ns / 1e9), 1) if eval_duration_ns > 0 else 0.0
-
-        return LLMReplyResult(
-            reply=reply,
-            engine=f"Ollama ({self.model_name})",
-            latency_ms=round(total_duration, 2),
-            prompt_tokens=prompt_eval_count,
-            completion_tokens=eval_count,
-            total_tokens=prompt_eval_count + eval_count,
-            speed_tps=speed_tps,
-        )
+        return self._to_result(_clean_llm_reply(data.get("response", "")), data, start)

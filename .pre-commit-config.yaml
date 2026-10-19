@@ -11,13 +11,13 @@ repos:
         entry: uv run --locked ruff check --fix
         language: system
         types_or: [python, pyi]
-        files: '^(src|tests|scripts)/'
+        files: '^(src|tests|scripts|evals)/'
       - id: ruff-format
         name: Ruff format
         entry: uv run --locked ruff format
         language: system
         types_or: [python, pyi]
-        files: '^(src|tests|scripts)/'
+        files: '^(src|tests|scripts|evals)/'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

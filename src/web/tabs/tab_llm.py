@@ -56,8 +56,8 @@ def reset_llm_session(enabled):
 
 
 def create_llm_tab():
-    with gr.TabItem("6. LLM (локальная модель)"):
-        gr.Markdown("### 6. Общение с LLM")
+    with gr.TabItem("5. LLM (локальная модель)"):
+        gr.Markdown("### 5. Общение с LLM")
         gr.Markdown(
             "Введите промпт. При необходимости добавьте инструкции и дополнительный контекст."
         )

@@ -1,86 +1,50 @@
-"""Tab 3: Vision-Language Model (VLM) & Image-to-Text Scene Understanding."""
+"""Tab 3: Zero-shot stream scene classification with CLIP."""
 
 import gradio as gr
-from src.web.state import web_state
+
 from src.monitoring.decorators import safe_telemetry_dispatch
 from src.metrics import record_model_latency
+from src.scene_classify import SCENE_LABELS_RU, SCENE_PROMPTS
+from src.web.state import web_state
 
 
-def handle_image_describe(image, model_choice, prompt_text):
-    """Processes image via selected VLM or Captioning model with custom visual prompt."""
+def handle_scene_classify(image):
+    """Returns class probabilities for the Label component, latency and the model name."""
     if image is None:
-        return "Изображение не загружено", "0 ms", "Нет данных"
-
+        return {}, "0 ms", "Изображение не загружено"
+    if not web_state.scene_model:
+        return {}, "0 ms", "Модель CLIP не загружена"
     try:
-        model = web_state.get_image_classifier(model_choice)
-    except Exception as e:
-        return f"Ошибка инициализации модели {model_choice}: {e}", "0 ms", "Ошибка"
-
-    try:
-        res = model.classify_image(image, top_k=5, prompt=prompt_text)
+        res = web_state.scene_model.classify_image(image)
     except Exception as exc:
-        return f"Ошибка описания изображения: {exc}", "0 ms", model.model_name
-    lat_ms = (
-        res.inference_latency_ms
-        if hasattr(res, "inference_latency_ms")
-        else res.get("inference_latency_ms", 50)
-    )
-    safe_telemetry_dispatch(record_model_latency, "image_classify", lat_ms / 1000.0)
-
-    caption = (
-        res.top_prediction if hasattr(res, "top_prediction") else res.get("top_prediction", "")
-    )
-    latency_str = f"{lat_ms:.1f} ms"
-    arch_type = (
-        "VLM (Vision-Language)" if getattr(model, "is_vlm", False) else "Image-to-Text Captioning"
-    )
-    model_info = f"{model.model_name} [{arch_type}]"
-
-    return caption, latency_str, model_info
-
-
-# Backward-compatible handler alias
-def handle_image_classify(image):
-    caption, _, _ = handle_image_describe(
-        image,
-        "Qwen/Qwen2-VL-2B-Instruct",
-        "",
-    )
-    return {caption: 1.0}
+        return {}, "0 ms", f"Ошибка классификации: {exc}"
+    safe_telemetry_dispatch(record_model_latency, "image_scene", res.inference_latency_ms / 1000.0)
+    probs = {SCENE_LABELS_RU.get(i.label, i.label): i.probability for i in res.predictions}
+    return probs, f"{res.inference_latency_ms:.1f} ms", web_state.scene_model.model_name
 
 
 def create_image_tab():
-    with gr.TabItem("3. Сравнение: BLIP Large"):
-        gr.Markdown("### 3. Описание изображения (Image-to-Text Captioning)")
+    classes = "\n".join(
+        f"- **{SCENE_LABELS_RU[label]}** (`{label}`): " + "; ".join(f"_{p}_" for p in prompts)
+        for label, prompts in SCENE_PROMPTS.items()
+    )
+    with gr.TabItem("3. Изображение (CLIP)"):
+        gr.Markdown("### 3. Zero-shot классификация сцены кадра")
         gr.Markdown(
-            "**Модель:** `Salesforce/blip-image-captioning-large` — описание изображения текстом.\n\n"
-            "**Инструменты:** Hugging Face Transformers, PyTorch. Время запроса показано рядом с результатом. Сравните описание с ответом VLM на том же кадре.\n\n"
-            "При стандартном VISION_BACKEND=ollama BLIP загружается по ручному запросу. В режиме transformers модель IMAGE_MODEL также загружается при запуске Gradio; эта вкладка всегда использует BLIP Large."
+            "**Модель:** `openai/clip-vit-base-patch32`, Hugging Face Transformers. "
+            "Классы заданы текстовыми описаниями без обучения; вероятности распределены "
+            "только между этими классами.\n\n" + classes
         )
-
         with gr.Row():
             with gr.Column(scale=1):
-                img_in = gr.Image(sources=["upload", "webcam"], label="Изображение", type="pil")
-                prompt_in = gr.Textbox(
-                    label="Направляющий промпт (опционально для условной генерации)",
-                    value="",
-                    lines=2,
-                )
-                btn_img = gr.Button(
-                    "Сгенерировать описание сцены (BLIP Large)", variant="primary", size="lg"
-                )
-
+                img_in = gr.Image(sources=["upload", "webcam"], label="Кадр", type="pil")
+                btn = gr.Button("Классифицировать сцену", variant="primary")
             with gr.Column(scale=1):
-                out_caption = gr.Textbox(
-                    label="Сгенерированное описание сцены (Scene Caption)", lines=6
-                )
+                out_label = gr.Label(label="Тип сцены", num_top_classes=len(SCENE_PROMPTS))
                 with gr.Row():
-                    out_latency = gr.Textbox(label="Время инференса (Latency)", scale=1)
-                    out_model = gr.Textbox(label="Активная архитектура и модель", scale=2)
+                    out_latency = gr.Textbox(label="Время инференса", scale=1)
+                    out_model = gr.Textbox(label="Модель", scale=2)
 
-        def _handle_blip(image, prompt):
-            return handle_image_describe(image, "Salesforce/blip-image-captioning-large", prompt)
-
-        btn_img.click(
-            _handle_blip, inputs=[img_in, prompt_in], outputs=[out_caption, out_latency, out_model]
+        btn.click(
+            handle_scene_classify, inputs=[img_in], outputs=[out_label, out_latency, out_model]
         )

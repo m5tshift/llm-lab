@@ -1,14 +1,13 @@
 """Shared Web UI application state and model registry."""
 
 from typing import Optional, Dict, Any
-import threading
 
 from src.nlp_sentiment import ChatSentimentAnalyzer
 from src.audio_transcribe import StreamAudioTranscriber
-from src.image_classify import StreamImageClassifier
+from src.scene_classify import SceneClassifier
 from src.video_live import LiveStreamVideoDetector
 from src.llm_brain import LocalLLMBrain
-from src.vision_backend import create_vision_classifier
+from src.vision_backend import OllamaVisionClassifier
 
 
 class WebState:
@@ -33,31 +32,14 @@ class WebState:
         self.active_audio_listener: Any = None
         self.nlp_model: Optional[ChatSentimentAnalyzer] = None
         self.audio_model: Optional[StreamAudioTranscriber] = None
-        self.image_model: Optional[StreamImageClassifier] = None
-        self._image_models: Dict[str, StreamImageClassifier] = {}
-        self._image_models_lock = threading.Lock()
-        self.vision_model = None
+        self.scene_model: Optional[SceneClassifier] = None
+        self.vision_model: Optional[OllamaVisionClassifier] = None
         self.video_model: Optional[LiveStreamVideoDetector] = None
         self.llm_model: Optional[LocalLLMBrain] = None
-
-    def get_image_classifier(self, model_name: Optional[str] = None) -> StreamImageClassifier:
-        """Returns loaded image/VLM classifier from cache or instantiates it on-demand."""
-        from src.core.config import settings
-
-        target_name = (
-            model_name or getattr(settings.models, "vlm_model", "Qwen/Qwen2-VL-2B-Instruct")
-        ).strip()
-        with self._image_models_lock:
-            if target_name not in self._image_models:
-                print(f"[Web UI] Initializing vision/VLM model: {target_name}...")
-                self._image_models[target_name] = StreamImageClassifier(model_name=target_name)
-            return self._image_models[target_name]
 
     def preload_models(self):
         """Loads models safely with individual exception handling."""
         print("[Web UI] Pre-loading models for interactive demo...")
-        from src.core.config import settings
-
         try:
             self.nlp_model = ChatSentimentAnalyzer()
         except Exception as e:
@@ -69,13 +51,14 @@ class WebState:
             print(f"[Warn] Audio model load deferred: {e}")
 
         try:
-            self.vision_model = create_vision_classifier()
-            if settings.models.vision_backend == "transformers":
-                self.image_model = self.get_image_classifier(settings.models.image_model)
-            else:
-                self.image_model = None
+            self.scene_model = SceneClassifier()
         except Exception as e:
-            print(f"[Warn] Image model load deferred: {e}")
+            print(f"[Warn] Scene model load deferred: {e}")
+
+        try:
+            self.vision_model = OllamaVisionClassifier()
+        except Exception as e:
+            print(f"[Warn] Vision model load deferred: {e}")
 
         try:
             self.video_model = LiveStreamVideoDetector()

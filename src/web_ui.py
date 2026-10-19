@@ -9,7 +9,7 @@ from src.web.state import web_state
 from src.web.styles import make_chat_status_html
 from src.web.tabs.tab_text import handle_sentiment_single, handle_sentiment_batch
 from src.web.tabs.tab_audio import handle_audio_transcribe
-from src.web.tabs.tab_image import handle_image_classify
+from src.web.tabs.tab_image import handle_scene_classify
 from src.web.tabs.tab_video import handle_frame_detect
 from src.web.tabs.tab_llm import handle_llm_reaction
 from src.web.tabs.tab_twitch import handle_stream_question, stream_live_twitch
@@ -23,7 +23,7 @@ __all__ = [
     "handle_sentiment_single",
     "handle_sentiment_batch",
     "handle_audio_transcribe",
-    "handle_image_classify",
+    "handle_scene_classify",
     "handle_frame_detect",
     "handle_llm_reaction",
     "handle_stream_question",

@@ -2,14 +2,14 @@
 
 import base64
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 from PIL import Image
 
 from src.core.config import settings
-from src.vision_backend import OllamaVisionClassifier, create_vision_classifier
+from src.vision_backend import OllamaVisionClassifier
 
 
 @patch("requests.post")
@@ -51,17 +51,3 @@ def test_empty_vision_prompt_has_no_hidden_instructions(post, prompt):
     assert payload["messages"][0]["content"] == ""
     assert payload["messages"][0]["images"]
     assert result.top_prediction == "Красный квадрат"
-
-
-def test_unified_backend_does_not_load_transformers_weights(monkeypatch):
-    monkeypatch.setattr(settings.models, "vision_backend", "ollama")
-    with patch("src.vision_backend.StreamImageClassifier") as legacy:
-        assert isinstance(create_vision_classifier(), OllamaVisionClassifier)
-        legacy.assert_not_called()
-
-
-def test_legacy_backend_still_available(monkeypatch):
-    monkeypatch.setattr(settings.models, "vision_backend", "transformers")
-    with patch("src.vision_backend.StreamImageClassifier", return_value=MagicMock()) as legacy:
-        assert create_vision_classifier() is legacy.return_value
-        legacy.assert_called_once_with(model_name=settings.models.vlm_model)

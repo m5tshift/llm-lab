@@ -4,14 +4,11 @@ Structured into domain sub-models (models, network, twitch) with environment var
 """
 
 import os
-from typing import Optional, Literal
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
 class ModelSettings(BaseModel):
-    vision_backend: Literal["ollama", "transformers"] = Field(
-        default_factory=lambda: os.getenv("VISION_BACKEND", "ollama")
-    )
     ollama_context: int = Field(
         default_factory=lambda: int(os.getenv("OLLAMA_CONTEXT", "4096")), ge=512
     )
@@ -30,12 +27,8 @@ class ModelSettings(BaseModel):
         description="Target transcription language",
     )
     image_model: str = Field(
-        default_factory=lambda: os.getenv("IMAGE_MODEL", "Salesforce/blip-image-captioning-large"),
-        description="Vision image-to-text / captioning model backbone",
-    )
-    vlm_model: str = Field(
-        default_factory=lambda: os.getenv("VLM_MODEL", "Qwen/Qwen2-VL-2B-Instruct"),
-        description="Vision-language checkpoint used when VISION_BACKEND=transformers",
+        default_factory=lambda: os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32"),
+        description="CLIP checkpoint for zero-shot scene classification",
     )
     yolo_model: str = Field(
         default_factory=lambda: os.getenv("YOLO_MODEL", "yolo26s.pt"),
@@ -50,6 +43,12 @@ class ModelSettings(BaseModel):
     ollama_model: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen3.5:9b"),
         description="Target LLM model tag",
+    )
+    ollama_seed: Optional[int] = Field(
+        default_factory=lambda: (
+            int(os.environ["OLLAMA_SEED"]) if os.getenv("OLLAMA_SEED") else None
+        ),
+        description="Fixed sampling seed for repeatable LLM evaluation",
     )
     ollama_timeout: float = Field(
         default_factory=lambda: float(os.getenv("OLLAMA_TIMEOUT", "120.0")),

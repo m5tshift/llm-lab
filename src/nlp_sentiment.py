@@ -36,15 +36,16 @@ EMOTION_RU_NAMES = {
 class ChatSentimentAnalyzer(BaseTextAnalyzer):
     """Analyzes the emotional tone and discrete emotions of chat messages using Hugging Face."""
 
-    def __init__(self, model_name: Optional[str] = None):
+    def __init__(self, model_name: Optional[str] = None, device: Optional[str] = None):
         self.model_name = model_name or settings.models.nlp_model
+        self.device = device or "cpu"
         print(f"[NLP] Loading Sentiment / Emotion model: '{self.model_name}'...")
         start = time.perf_counter()
         self.pipe = pipeline(
             "text-classification",
             model=self.model_name,
             top_k=None,
-            device=-1,  # -1 for CPU, 0 for CUDA
+            device=self.device,
         )
         self.load_time = time.perf_counter() - start
         print(f"[NLP] Model loaded successfully in {self.load_time:.2f}s")
@@ -86,6 +87,11 @@ class ChatSentimentAnalyzer(BaseTextAnalyzer):
                 "emotions": {s["label"]: round(float(s["score"]), 4) for s in raw_scores},
             }
 
+    def predict_scores(self, texts: List[str], batch_size: int = 32) -> List[Dict[str, float]]:
+        """Raw per-label scores (model label names) for each text, for evaluation."""
+        outputs = self.pipe(texts, batch_size=batch_size)
+        return [{s["label"].lower(): float(s["score"]) for s in scores} for scores in outputs]
+
     def analyze_message(self, text: str) -> SingleSentimentResult:
         """Analyze sentiment and emotions for a single message."""
         start = time.perf_counter()
@@ -104,7 +110,7 @@ class ChatSentimentAnalyzer(BaseTextAnalyzer):
         )
 
     def analyze_chat_batch(self, messages: List[str]) -> BatchSentimentResult:
-        """Analyze a batch of chat messages and compute aggregate chat mood and emotions."""
+        """Analyze a batch of message texts (without author prefixes) and aggregate the mood."""
         if not messages:
             return BatchSentimentResult(
                 dominant_mood="NEUTRAL",
@@ -114,16 +120,8 @@ class ChatSentimentAnalyzer(BaseTextAnalyzer):
                 total_messages=0,
             )
 
-        clean_texts = []
-        for msg in messages:
-            if ":" in msg and not msg.startswith("http"):
-                parts = msg.split(":", 1)
-                clean_texts.append(parts[1].strip() if parts[1].strip() else msg)
-            else:
-                clean_texts.append(msg)
-
         start = time.perf_counter()
-        results = self.pipe(clean_texts)
+        results = self.pipe(messages)
         total_latency_ms = (time.perf_counter() - start) * 1000
 
         detailed = []

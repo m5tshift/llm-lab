@@ -90,9 +90,9 @@ class TestApiEndpoints(unittest.TestCase):
             predictions=[],
             inference_latency_ms=120.0,
         )
-        api_module.vlm_model = mock_image
+        api_module.vision_model = mock_image
 
-        file_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        file_content = _png_bytes()
         resp = self.client.post(
             "/api/image/vlm",
             files={"file": ("test.png", file_content, "image/png")},
@@ -104,6 +104,41 @@ class TestApiEndpoints(unittest.TestCase):
             data["top_prediction"], "На экране трансляции виден интерфейс игры, счет 5:3"
         )
         self.assertEqual(data["confidence"], 0.98)
+
+    def test_scene_endpoint_returns_class_probabilities(self):
+        mock_scene = MagicMock()
+        mock_scene.classify_image.return_value = ImageClassificationResult(
+            top_prediction="gameplay", confidence=0.91, predictions=[], inference_latency_ms=30.0
+        )
+        api_module.scene_model = mock_scene
+        resp = self.client.post(
+            "/api/image/scene", files={"file": ("frame.png", _png_bytes(), "image/png")}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["top_prediction"], "gameplay")
+
+    def test_non_image_upload_is_rejected_with_400(self):
+        api_module.scene_model = MagicMock()
+        resp = self.client.post(
+            "/api/image/scene", files={"file": ("notes.txt", b"not an image", "text/plain")}
+        )
+        self.assertEqual(resp.status_code, 400)
+        api_module.scene_model.classify_image.assert_not_called()
+
+    def test_empty_batch_is_rejected(self):
+        api_module.nlp_model = MagicMock()
+        resp = self.client.post("/api/text/batch-sentiment", json={"messages": []})
+        self.assertEqual(resp.status_code, 422)
+
+
+def _png_bytes():
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), "green").save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 if __name__ == "__main__":

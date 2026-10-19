@@ -5,22 +5,19 @@ import io
 import time
 
 from src.core.config import settings
+from src.core.images import load_pil_image
 from src.core.interfaces import BaseImageClassifier
 from src.core.schemas import ImageClassificationResult
-from src.image_classify import StreamImageClassifier
 from src.llm_brain import _clean_llm_reply
 from src.ollama_client import generate
 
 
 class OllamaVisionClassifier(BaseImageClassifier):
-    is_vlm = True
-    is_caption_model = False
-
     def __init__(self):
         self.model_name = settings.models.ollama_model
 
     def classify_image(self, image_input, top_k=5, prompt=None, max_new_tokens=160):
-        image = StreamImageClassifier._load_pil_image(image_input).copy()
+        image = load_pil_image(image_input).copy()
         image.thumbnail((1280, 1280))
         buffer = io.BytesIO()
         image.save(buffer, format="JPEG", quality=90)
@@ -61,9 +58,3 @@ class OllamaVisionClassifier(BaseImageClassifier):
             predictions=[],
             inference_latency_ms=round((time.perf_counter() - started) * 1000, 2),
         )
-
-
-def create_vision_classifier():
-    if settings.models.vision_backend == "ollama":
-        return OllamaVisionClassifier()
-    return StreamImageClassifier(model_name=settings.models.vlm_model)

@@ -7,7 +7,7 @@ import time
 import os
 import subprocess
 import threading
-from typing import Optional
+from typing import Optional, Tuple
 import cv2
 import numpy as np
 
@@ -29,6 +29,7 @@ class TwitchStreamSource:
         self._stop_event = threading.Event()
         self._capture_thread: Optional[threading.Thread] = None
         self._latest_frame: Optional[np.ndarray] = None
+        self._frame_seq = 0
         self._frame_lock = threading.Lock()
         self._new_frame_event = threading.Event()
 
@@ -89,6 +90,7 @@ class TwitchStreamSource:
             if ret and frame is not None:
                 with self._frame_lock:
                     self._latest_frame = frame
+                    self._frame_seq += 1
                 self._new_frame_event.set()
 
         # Start continuous background frame reader thread to prevent network I/O lag in main loop
@@ -115,6 +117,7 @@ class TwitchStreamSource:
             if ret and frame is not None:
                 with self._frame_lock:
                     self._latest_frame = frame
+                    self._frame_seq += 1
                 self._new_frame_event.set()
             else:
                 time.sleep(0.01)
@@ -138,6 +141,13 @@ class TwitchStreamSource:
                 if self._latest_frame is not None:
                     return self._latest_frame.copy()
         return None
+
+    def get_frame_with_seq(self) -> Tuple[int, Optional[np.ndarray]]:
+        """Returns (sequence number, copy of the latest frame); the number grows per decoded frame."""
+        with self._frame_lock:
+            if self._latest_frame is None:
+                return self._frame_seq, None
+            return self._frame_seq, self._latest_frame.copy()
 
     def capture_audio_chunk(
         self, duration_s: int = 5, output_wav: str = "temp_stream_audio.wav"

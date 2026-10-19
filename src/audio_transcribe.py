@@ -7,7 +7,7 @@ Task: Automatic Speech Recognition (ASR)
 import time
 import os
 import re
-from typing import Optional
+from typing import Any, Dict, Optional, Union
 from collections import Counter
 from transformers import pipeline
 
@@ -71,9 +71,18 @@ def clean_transcription_text(text: str) -> str:
 class StreamAudioTranscriber(BaseAudioTranscriber):
     """Transcribes audio clips into text using OpenAI Whisper."""
 
-    def __init__(self, model_name: Optional[str] = None, default_language: Optional[str] = None):
+    def __init__(
+        self,
+        model_name: Optional[str] = None,
+        default_language: Optional[str] = None,
+        device: Optional[str] = None,
+        max_new_tokens: int = 64,
+    ):
         self.model_name = model_name or settings.models.whisper_model
         self.default_language = default_language or settings.models.whisper_language
+        self.device = device or "cpu"
+        # 64 tokens fit the 3-5 s live chunks; longer evaluation utterances need more.
+        self.max_new_tokens = max_new_tokens
 
         print(
             f"[Audio] Loading ASR Whisper model: '{self.model_name}' (Default language: {self.default_language})..."
@@ -83,7 +92,7 @@ class StreamAudioTranscriber(BaseAudioTranscriber):
             "automatic-speech-recognition",
             model=self.model_name,
             chunk_length_s=30,
-            device=-1,  # -1 for CPU, 0 for CUDA
+            device=self.device,
         )
         self.load_time = time.perf_counter() - start
         print(f"[Audio] Model loaded successfully in {self.load_time:.2f}s")
@@ -94,18 +103,26 @@ class StreamAudioTranscriber(BaseAudioTranscriber):
         """Transcribes an audio file (.wav, .mp3, .flac)."""
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
+        return self.transcribe(audio_path, language=language)
+
+    def transcribe(
+        self, audio: Union[str, Dict[str, Any]], language: Optional[str] = None
+    ) -> AudioTranscriptionResult:
+        """Transcribes a file path or {"array": np.ndarray, "sampling_rate": int}."""
+        if isinstance(audio, dict):
+            audio = {"raw": audio["array"], "sampling_rate": audio["sampling_rate"]}
 
         target_lang = language if language is not None else self.default_language
         gen_kwargs = {
             "task": "transcribe",
-            "max_new_tokens": 64,
+            "max_new_tokens": self.max_new_tokens,
             "no_repeat_ngram_size": 3,
         }
         if target_lang and target_lang.lower() not in ("auto", "none", "detect"):
             gen_kwargs["language"] = target_lang.lower()
 
         start = time.perf_counter()
-        result = self.pipe(audio_path, generate_kwargs=gen_kwargs)
+        result = self.pipe(audio, generate_kwargs=gen_kwargs)
         inference_time_s = time.perf_counter() - start
 
         raw_text = result.get("text", "").strip()
@@ -113,9 +130,9 @@ class StreamAudioTranscriber(BaseAudioTranscriber):
 
         return AudioTranscriptionResult(
             transcription=cleaned_text,
+            raw_transcription=raw_text,
             language=target_lang or "auto",
             inference_time_s=round(inference_time_s, 3),
-            latency_ms=round(inference_time_s * 1000.0, 2),
         )
 
 

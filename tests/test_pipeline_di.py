@@ -37,12 +37,10 @@ class TestPipelineDependencyInjection(unittest.TestCase):
         # 3. Mock Image Classifier
         self.mock_image = MagicMock()
         self.mock_image.classify_image.return_value = ImageClassificationResult(
-            top_prediction="video game screen",
+            top_prediction="gameplay",
             confidence=0.92,
             predictions=[
-                ClassificationItem(
-                    rank=1, label="video game screen", probability=0.92, percentage="92.0%"
-                )
+                ClassificationItem(rank=1, label="gameplay", probability=0.92, percentage="92.0%")
             ],
             inference_latency_ms=10.0,
         )
@@ -98,16 +96,28 @@ class TestPipelineDependencyInjection(unittest.TestCase):
         )
         self.assertEqual(result.detailed_results["vlm_description"], "На табло 2:1")
 
-    def test_live_cycle_reuses_vision_without_running_another_image_request(self):
+    def test_scene_class_is_reported_in_russian_with_confidence(self):
         result = self.pipeline.process_stream_cycle(
             audio_file_path="dummy.wav",
             image_or_frame=np.zeros((2, 2, 3), dtype=np.uint8),
             chat_messages=[],
-            vlm_description="Синий прямоугольник",
-            use_cached_vision=True,
         )
-        self.mock_image.classify_image.assert_not_called()
-        self.assertEqual(result.scene_classification, "Синий прямоугольник")
+        self.mock_image.classify_image.assert_called_once()
+        self.assertEqual(result.scene_classification, "Игровой процесс (92%)")
+        self.assertEqual(
+            self.mock_llm.generate_reply.call_args.kwargs["scene_description"],
+            "Игровой процесс (92%)",
+        )
+
+    def test_llm_failure_completes_cycle(self):
+        self.mock_llm.generate_reply.side_effect = ConnectionError("refused")
+        result = self.pipeline.process_stream_cycle(
+            audio_file_path="dummy.wav",
+            image_or_frame=np.zeros((2, 2, 3), dtype=np.uint8),
+            chat_messages=[],
+        )
+        self.assertEqual(result.llm_engine, "unavailable")
+        self.assertIn("ConnectionError", result.bot_chat_reply)
 
 
 if __name__ == "__main__":

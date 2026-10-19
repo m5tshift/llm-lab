@@ -64,6 +64,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     HF_HOME=/home/appuser/.cache/huggingface \
     TORCH_HOME=/home/appuser/.cache/torch \
     YOLO_CONFIG_DIR=/home/appuser/.config/Ultralytics \
+    YOLO_AUTOINSTALL=False \
     GRADIO_SERVER_NAME=0.0.0.0 \
     GRADIO_SERVER_PORT=7860 \
     API_HOST=0.0.0.0 \

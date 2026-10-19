@@ -7,13 +7,14 @@ import gradio as gr
 
 from src.core.config import settings
 from src.live_vision import BackgroundVLMAnalyzer, LIVE_VLM_PROMPT
+from src.scene_classify import SCENE_LABELS_RU
 from src.prompts import (
     LIVE_BOT_PERSONALITY,
     LIVE_REACTION_PROMPT,
     LIVE_QUESTION_PROMPT,
     LIVE_QUESTION_SUFFIX,
 )
-from src.vision_backend import create_vision_classifier
+from src.vision_backend import OllamaVisionClassifier
 from src.web.state import web_state
 from src.web.styles import make_chat_status_html
 from src.connectors.twitch_chat import TwitchChatListener
@@ -224,11 +225,13 @@ def stream_live_twitch(
             "Ожидание анализа VLM...",
         )
         vlm_analyzer = BackgroundVLMAnalyzer(
-            model_factory=lambda: web_state.vision_model or create_vision_classifier(),
+            model_factory=lambda: web_state.vision_model or OllamaVisionClassifier(),
             interval_seconds=vlm_interval,
             max_age_seconds=max(60, vlm_interval * 2),
         )
         safe_telemetry_dispatch(set_stream_active, True)
+        if web_state.video_model:
+            web_state.video_model.reset_tracking()
 
         start_time = time.time()
         last_ai_time = start_time
@@ -242,6 +245,7 @@ def stream_live_twitch(
         cached_speech = "Ожидание речи стримера..."
         cached_chat_stats = {}
         frame_count = 0
+        last_seq = -1
         fps_tracker = FrameRateTracker()
         current_fps = 0.0
         elapsed = 0
@@ -274,20 +278,21 @@ def stream_live_twitch(
                         record_chat_stats, chat_res.positive_ratio, chat_res.negative_ratio
                     )
 
-                # 2. Scene classification (ResNet-50 / BLIP)
-                if snap_frame is not None and web_state.image_model:
-                    img_res = web_state.image_model.classify_image(snap_frame)
+                # 2. Scene type (CLIP zero-shot)
+                if snap_frame is not None and web_state.scene_model:
+                    scene_res = web_state.scene_model.classify_image(snap_frame)
+                    scene_name = SCENE_LABELS_RU.get(
+                        scene_res.top_prediction, scene_res.top_prediction
+                    )
                     with ai_lock:
-                        cached_scene_text = (
-                            f"{img_res.top_prediction} ({img_res.confidence * 100:.1f}%)"
-                        )
+                        cached_scene_text = f"{scene_name} ({scene_res.confidence * 100:.0f}%)"
                     safe_telemetry_dispatch(
                         record_model_latency,
-                        "image_classify",
-                        img_res.inference_latency_ms / 1000.0,
+                        "image_scene",
+                        scene_res.inference_latency_ms / 1000.0,
                     )
 
-                # 3. LLM Reaction (модель Ollama via Ollama)
+                # 3. LLM Reaction (with the background frame description from the LLM)
                 if web_state.llm_model:
                     with ai_lock:
                         cur_obj = cached_obj_text
@@ -332,33 +337,34 @@ def stream_live_twitch(
 
         while frame_count < max_frames:
             t_frame_start = time.perf_counter()
-            frame = source.get_frame()
-            if frame is None:
-                time.sleep(0.04)
+            seq, frame = source.get_frame_with_seq()
+            if frame is None or seq == last_seq:
+                time.sleep(0.01)  # Track only newly decoded frames, never the same frame twice.
                 continue
+            last_seq = seq
 
             frame_count += 1
             vlm_analyzer.submit(frame)
 
             if web_state.video_model:
-                det_res = web_state.video_model.process_frame(frame)
+                det_res = web_state.video_model.track_frame(frame)
                 annotated_rgb = cv2.cvtColor(det_res.annotated_frame, cv2.COLOR_BGR2RGB)
                 safe_telemetry_dispatch(record_detected_objects, det_res.detected_objects)
                 safe_telemetry_dispatch(
                     record_model_latency, "video_yolo", det_res.latency_ms / 1000.0
                 )
 
-                detected = det_res.detected_objects
-                if detected:
-                    counts = {}
-                    for obj in detected:
-                        cls = obj.class_name
-                        counts[cls] = counts.get(cls, 0) + 1
-                    with ai_lock:
-                        cached_obj_text = ", ".join([f"{k}: {v}" for k, v in counts.items()])
-                else:
-                    with ai_lock:
-                        cached_obj_text = "Объекты не найдены"
+                in_frame = {}
+                for obj in det_res.detected_objects:
+                    in_frame[obj.class_name] = in_frame.get(obj.class_name, 0) + 1
+                with ai_lock:
+                    cached_obj_text = (
+                        ", ".join(
+                            f"{name}: {n} в кадре, {det_res.unique_objects.get(name, n)} за сессию"
+                            for name, n in in_frame.items()
+                        )
+                        or "Объекты не найдены"
+                    )
             else:
                 annotated_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -369,10 +375,6 @@ def stream_live_twitch(
             elapsed = int(time.time() - start_time)
 
             with ai_lock:
-                if settings.models.vision_backend == "ollama":
-                    cached_scene_text = (
-                        vlm_analyzer.get_latest() or "Свежий анализ кадра пока не готов"
-                    )
                 web_state.stream_state["channel"] = clean_channel
                 web_state.stream_state["speech"] = cached_speech
                 web_state.stream_state["visual"] = cached_obj_text
@@ -471,7 +473,7 @@ def create_twitch_tab():
             "### 7. Прямая трансляция Twitch в реальном времени (HLS Video + Anonymous IRC Chat)"
         )
         gr.Markdown(
-            f"**{settings.models.ollama_model}** — анализ кадра и диалог; **YOLO26s** — объекты; **Whisper Small** — речь; **RuBERT** — чат."
+            f"**RuBERT** — чат; **Whisper Small** — речь; **CLIP** — тип сцены; **YOLO26s + ByteTrack** — объекты; **{settings.models.ollama_model}** — описание кадра, реакции и ответы."
         )
 
         with gr.Accordion("Препромпты, используемые на этой странице", open=False):

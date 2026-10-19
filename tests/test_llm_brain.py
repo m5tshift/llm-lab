@@ -151,12 +151,16 @@ class TestLocalLLMBrain(unittest.TestCase):
         self.assertIn("user1: gogogo", sent_prompt)
         self.assertIn("Позитив: 90%", sent_prompt)
 
-    def test_generate_reply_raises_when_ollama_unavailable(self):
+    @patch("requests.post")
+    def test_request_is_attempted_when_ollama_started_after_init(self, mock_post):
+        # A failed startup probe must not block requests once the server is up.
         self.brain.is_ollama_available = False
-        with self.assertRaises(RuntimeError):
-            self.brain.generate_reply(
-                streamer_speech="Тест", chat_mood="ПОЗИТИВ", visual_context=""
-            )
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"response": "Погнали!", "eval_count": 3}
+        res = self.brain.generate_reply(
+            streamer_speech="Тест", chat_mood="ПОЗИТИВ", visual_context=""
+        )
+        self.assertEqual(res.reply, "Погнали!")
 
     @patch("requests.post")
     def test_generate_reply_raises_on_http_error(self, mock_post):

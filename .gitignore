@@ -18,20 +18,22 @@
 !/samples/
 !/evals/
 !/scripts/
+!/results/
 
 # Keep only scripts that support the system.
 /scripts/*
 !/scripts/build_3_dashboards.py
-!/scripts/run_evals.py
-!/scripts/verify_unified_model.py
+!/scripts/collect_stream_data.py
+!/scripts/summary_table.py
+!/scripts/build_pdf.py
 
 # Only the bundled demonstration fixtures belong in the repository.
 /samples/*
 !/samples/chat_messages.json
 !/samples/sample_speech.wav
 !/samples/sample_stream.jpg
-/evals/*
-!/evals/cases.json
+# Evaluation datasets, frames and clips are downloaded or collected locally.
+/evals/local/
 
 # Local configuration, credentials and editor settings at any depth.
 .env
@@ -98,6 +100,8 @@ Thumbs.db
 *.tar
 *.gz
 
-# Documentation other than the root README stays local.
+# Documentation other than the root README, REPORT and TESTING stays local.
 *.md
 !/README.md
+!/REPORT.md
+!/TESTING.md

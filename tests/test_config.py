@@ -10,7 +10,7 @@ class TestConfig(unittest.TestCase):
         cfg = AppConfig()
         self.assertIsNotNone(cfg.models.nlp_model)
         self.assertIsNotNone(cfg.models.whisper_model)
-        self.assertIsNotNone(cfg.models.vlm_model)
+        self.assertIsNotNone(cfg.models.image_model)
         self.assertIsNotNone(cfg.network.api_port)
         self.assertEqual(cfg.twitch.irc_port, 6697)
 

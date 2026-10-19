@@ -1,96 +1,135 @@
-"""Evaluation accounting must not disguise failures or unreviewed outputs."""
+"""Metric code of the evaluation scripts, checked on hand-computed examples."""
 
-import csv
+from pathlib import Path
 
 import pytest
 
-from scripts.run_evals import (
-    APIBackend,
-    ROOT,
-    checks,
-    fixture_image,
-    load_cases,
-    measure,
-    percentile,
-    score_review,
-    summarize,
-)
+from evals.audio import normalize
+from evals.common import classification_report, latency_stats, multilabel_report, subsample
+from evals.llm import auto_checks, sentence_count
+from evals.text import gold_labels, predicted_labels
 
 
-def case():
-    return {"id": "test", "task": "reaction", "deadline_ms": 1000, "rubric": "facts"}
+def test_single_label_report_matches_hand_count():
+    report = classification_report(["a", "a", "b", "b"], ["a", "b", "b", "b"], ["a", "b"])
+    assert report["accuracy"] == 0.75
+    assert report["per_class"]["a"] == {"precision": 1.0, "recall": 0.5, "f1": 0.6667, "support": 2}
+    assert report["per_class"]["b"]["precision"] == pytest.approx(0.6667, abs=1e-4)
+    assert report["confusion_matrix"]["rows_true_cols_pred"] == [[1, 1], [0, 2]]
 
 
-def test_failure_is_not_fast_success():
-    def fail(_):
-        raise TimeoutError("model timeout")
-
-    row = measure(case(), fail, 1)
-    summary = summarize([row])["reaction"]
-    assert not row["on_time"] and not row["automatic_pass"]
-    assert summary["error_rate"] == 1
-    assert summary["successful_latency_p95_ms"] is None
+def test_macro_f1_ignores_classes_without_support():
+    report = classification_report(["a", "a"], ["a", "a"], ["a", "b"])
+    assert report["macro_f1"] == 1.0
 
 
-def test_checks_do_not_override_manual_quality():
-    row = measure(case(), lambda _: {"text": "invented score"}, 1)
-    assert row["automatic_pass"]
-    assert "quality_pass" not in row
-    assert not all(checks({"forbidden": ["score"]}, row["text"]).values())
+def test_multilabel_report_counts_each_label_independently():
+    gold = [["joy"], ["joy", "surprise"], ["no_emotion"]]
+    pred = [["joy"], ["joy"], ["anger"]]
+    report = multilabel_report(gold, pred, ["no_emotion", "joy", "surprise", "anger"])
+    assert report["per_class"]["joy"]["f1"] == 1.0
+    assert report["per_class"]["surprise"]["recall"] == 0.0
+    assert report["exact_match"] == pytest.approx(1 / 3, abs=1e-4)
 
 
-def test_review_requires_complete_scores_and_counts_errors(tmp_path):
-    rows = [measure(case(), lambda _: {"text": "answer"}, n) for n in (1, 2)]
-    path = tmp_path / "review.csv"
-    path.write_text("run_id,correct,relevant,grounded\ntest:1,1,1,1\ntest:2,,,\n")
-    result = score_review(rows, path)
-    assert result["reviewed_n"] == 1 and not result["complete"]
-    rows[0]["status"] = "error"
-    rows[0]["on_time"] = False
-    result = score_review(rows, path)
-    assert result["quality_pass_rate_on_reviewed"] == 0
-    assert result["correct_and_timely_rate_on_reviewed"] == 0
+def test_cedr_labels_map_to_model_labels():
+    names = ["joy", "sadness", "surprise", "fear", "anger"]
+    assert gold_labels([], names) == ["no_emotion"]
+    assert gold_labels([0, 4], names) == ["joy", "anger"]
+    assert predicted_labels({"joy": 0.7, "anger": 0.2, "no_emotion": 0.9}, 0.5) == ["joy"]
+    assert predicted_labels({"joy": 0.1, "no_emotion": 0.3}, 0.5) == ["no_emotion"]
 
 
-@pytest.mark.parametrize("entries", ["test:1,2,1,1", "unknown,1,1,1", "test:1,1,1,1\ntest:1,1,1,1"])
-def test_invalid_review_rejected(tmp_path, entries):
-    path = tmp_path / "review.csv"
-    path.write_text("run_id,correct,relevant,grounded\n" + entries + "\n")
-    with pytest.raises(ValueError):
-        score_review([measure(case(), lambda _: {"text": "ok"}, 1)], path)
+def test_wer_normalization_ignores_case_punctuation_and_yo():
+    assert normalize("Ещё раз, ПРИВЕТ!  Всем…") == "еще раз привет всем"
 
 
-def test_percentiles_and_suite():
-    assert percentile([1, 2, 100], 0.95) == 100
-    assert percentile([], 0.5) is None
-    cases = load_cases(ROOT / "evals/cases.json")
-    assert {c["task"] for c in cases} == {"sentiment", "vision", "reaction", "combined"}
-    assert fixture_image("score") == fixture_image("score")
+def test_latency_stats_and_deterministic_subsample():
+    stats = latency_stats([10, 20, 30, 40])
+    assert stats["p50_ms"] == 25.0 and stats["n"] == 4
+    items = list(range(100))
+    assert subsample(items, 10, 1) == subsample(items, 10, 1)
+    assert subsample(items, None, 1) == items
 
 
-def test_local_only():
-    with pytest.raises(ValueError):
-        APIBackend("https://example.com", 1)
+def test_llm_auto_checks_flag_missing_facts_and_trap_refusal():
+    scenario = {"expect": [["2:1"]], "forbid": [r"\d+ лет"], "trap": False}
+    assert auto_checks(scenario, "На табло 2:1 в пользу хозяев.")["facts_ok"]
+    assert not auto_checks(scenario, "Счёт не виден.")["facts_ok"]
+    trap = {"expect": [], "forbid": [], "trap": True}
+    assert auto_checks(trap, "В контексте нет данных об этом.")["trap_refused"]
+    assert not auto_checks(trap, "Стримеру 25 лет.")["trap_refused"]
+    assert sentence_count("Первое. Второе! Третье?") == 3
 
 
-def test_sentiment_f1_counts_failed_requests():
-    positive = dict(case(), task="sentiment", expected_label="POSITIVE")
-    negative = dict(case(), id="neg", task="sentiment", expected_label="NEGATIVE")
+def test_llm_eval_run_and_review_round_trip(tmp_path, monkeypatch):
+    import csv
+    import json
+    from argparse import Namespace
 
-    def fail(_):
-        raise TimeoutError("timeout")
+    import evals.llm as llm_eval
+    from src.core.schemas import LLMReplyResult
 
-    rows = [measure(positive, lambda _: {"text": "POSITIVE"}, 1), measure(negative, fail, 1)]
-    summary = summarize(rows)["sentiment"]
-    assert summary["macro_f1"] == 0.5
-    assert summary["unique_cases"] == 2
+    class FakeBrain:
+        model_name = "fake:1b"
 
+        def answer_stream_question(self, user_question, **_):
+            return LLMReplyResult(
+                reply="Данных об этом нет. Счёт 2:1.", engine="fake", latency_ms=5.0, speed_tps=10.0
+            )
 
-def test_generated_csv_compatible(tmp_path):
-    path = tmp_path / "review.csv"
-    with path.open("w", encoding="utf-8-sig", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=["run_id", "correct", "relevant", "grounded"])
+    monkeypatch.setattr("src.llm_brain.LocalLLMBrain", FakeBrain)
+    monkeypatch.setattr(llm_eval, "ollama_memory", lambda *_: None)
+    llm_eval.run(Namespace(limit=3, output_dir=tmp_path))
+
+    review = next(tmp_path.glob("llm/*.review.csv"))
+    with open(review, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 3
+    for row in rows:
+        row.update(score_correct="2", score_grounded="1", score_style="2", hallucination="0")
+    with open(review, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
         writer.writeheader()
-        writer.writerow({"run_id": "test:1"})
-    result = score_review([measure(case(), lambda _: {"text": "ok"}, 1)], path)
-    assert result["quality_pass_rate_on_reviewed"] is None
+        writer.writerows(rows)
+
+    llm_eval.review(Namespace(review=review))
+    result = json.loads(next(tmp_path.glob("llm/*.json")).read_text(encoding="utf-8"))
+    assert result["metrics"]["manual"]["rubric_mean"] == pytest.approx(5 / 3, abs=1e-3)  # 0–2 scale
+    assert result["summary"]["value"] == result["metrics"]["manual"]["rubric_mean"]
+
+
+def test_frame_manifest_paths_resolve_from_another_folder(tmp_path):
+    import cv2
+    import numpy as np
+
+    from evals.common import read_manifest
+    from scripts.collect_stream_data import main as collect
+
+    video = tmp_path / "clip.mp4"
+    writer = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"mp4v"), 10, (64, 48))
+    for _ in range(5):
+        writer.write(np.zeros((48, 64, 3), dtype=np.uint8))
+    writer.release()
+    manifest = tmp_path / "data" / "scene_labels.csv"
+    frames = tmp_path / "local" / "frames"
+
+    collect(
+        [
+            "frames",
+            "--video",
+            str(video),
+            "--every",
+            "0",
+            "--count",
+            "2",
+            "--out",
+            str(frames),
+            "--manifest",
+            str(manifest),
+        ]
+    )
+
+    rows = read_manifest(manifest, ["path", "label"])
+    assert len(rows) == 2
+    assert all(Path(r["path"]).parent == frames.resolve() for r in rows)

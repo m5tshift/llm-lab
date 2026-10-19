@@ -1,4 +1,4 @@
-"""Tab 4: Image analysis with the configured vision-language model."""
+"""Tab 4: Image analysis with the shared Ollama vision-language model."""
 
 import time
 import os
@@ -6,7 +6,7 @@ import gradio as gr
 from PIL import Image
 
 from src.web.state import web_state
-from src.vision_backend import create_vision_classifier
+from src.vision_backend import OllamaVisionClassifier
 from src.monitoring.decorators import safe_telemetry_dispatch
 from src.metrics import record_model_latency
 
@@ -15,7 +15,7 @@ SAMPLE_IMAGE_PATH = os.path.join("samples", "sample_stream.jpg")
 
 
 def handle_vlm_analyze(image, prompt_text):
-    """Processes an image with the configured vision-language model."""
+    """Processes an image with the shared Ollama vision-language model."""
     if image is None:
         return (
             "Изображение не загружено. Пожалуйста, загрузите скриншот или используйте пример.",
@@ -26,10 +26,10 @@ def handle_vlm_analyze(image, prompt_text):
     clean_prompt = (prompt_text or "").strip()
 
     try:
-        model = web_state.vision_model or create_vision_classifier()
+        model = web_state.vision_model or OllamaVisionClassifier()
         web_state.vision_model = model
     except Exception as e:
-        return f"Ошибка инициализации настроенной VLM: {e}", "0 ms", "Ошибка инициализации"
+        return f"Ошибка инициализации VLM: {e}", "0 ms", "Ошибка инициализации"
 
     start_t = time.perf_counter()
     try:
@@ -65,12 +65,11 @@ def load_sample_stream():
 
 
 def create_vlm_tab():
-    """Builds Tab 4: Vision-Language Model (VLM & OCR) demonstration."""
-    with gr.TabItem("4. Зрение (VLM & OCR)"):
-        gr.Markdown("### 4. Мультимодальный визуально-языковой анализ (VLM & OCR)")
+    """Builds the tab where the LLM answers questions about an image."""
+    with gr.TabItem("5б. LLM о кадре (Qwen3.5)"):
+        gr.Markdown("### Вопрос к LLM о кадре")
         gr.Markdown(
-            "**По умолчанию:** общая модель Ollama для изображения и диалога. При VISION_BACKEND=transformers анализ кадра выполняет отдельная VLM.\n\n"
-            "**Стек по умолчанию:** локальный Ollama, Qwen3.5 9B. Задержка измеряется при запросе.\n\n"
+            "**Модель:** общая модель Ollama (`OLLAMA_MODEL`, по умолчанию Qwen3.5 9B) для изображения и диалога. Задержка измеряется при запросе.\n\n"
             "**Эксперимент:** задайте вопрос о сцене, счёте матча или тексте интерфейса и сверьте ответ с кадром."
         )
 
@@ -97,7 +96,7 @@ def create_vlm_tab():
 
             with gr.Column(scale=1):
                 out_analysis = gr.Textbox(
-                    label="Семантический разбор кадра / Распознанный текст (OCR)",
+                    label="Ответ модели",
                     lines=8,
                     placeholder="Здесь появляется описание кадра, элементов интерфейса и распознанный текст",
                 )
@@ -109,7 +108,7 @@ def create_vlm_tab():
                     "**Что проверить:**\n"
                     "- Соответствует ли описание видимым объектам и событиям;\n"
                     "- Верно ли прочитаны мелкий текст и числа интерфейса;\n"
-                    "- Не добавляет ли модель детали, отсутствующие на кадре. Обработка изображения зависит от выбранного backend."
+                    "- Не добавляет ли модель детали, отсутствующие на кадре."
                 )
 
         # Load an example image

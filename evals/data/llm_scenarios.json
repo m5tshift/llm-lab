@@ -1,0 +1,862 @@
+[
+ {
+  "id": "screen-01",
+  "category": "screen",
+  "trap": false,
+  "question": "Что сейчас происходит на экране?",
+  "context": {
+   "channel": "cs_ru_pro",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Игровой процесс (91%)",
+   "objects": "person: 3 в кадре, 7 за сессию",
+   "vlm": "Шутер от первого лица, игрок с винтовкой на карте Mirage, в правом верхнем углу счёт раунда 9:6."
+  },
+  "expect": [
+   [
+    "шутер",
+    "игр"
+   ],
+   [
+    "9:6",
+    "9 : 6",
+    "девять"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "screen-02",
+  "category": "screen",
+  "trap": false,
+  "question": "Какой счёт на табло?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Игровой процесс (88%)",
+   "objects": "",
+   "vlm": "Футбольный симулятор, на табло счёт 2:1, 67-я минута матча."
+  },
+  "expect": [
+   [
+    "2:1",
+    "2 : 1",
+    "два.{0,10}один"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "screen-03",
+  "category": "screen",
+  "trap": false,
+  "question": "Что сейчас показывает стример — игру или себя?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Камера стримера (84%)",
+   "objects": "person: 1 в кадре, 1 за сессию",
+   "vlm": "Крупный план человека в наушниках перед микрофоном, на фоне полка с фигурками."
+  },
+  "expect": [
+   [
+    "камер",
+    "себя",
+    "лиц",
+    "человек"
+   ]
+  ],
+  "forbid": [
+   "\\bиграет в\\b"
+  ]
+ },
+ {
+  "id": "screen-04",
+  "category": "screen",
+  "trap": false,
+  "question": "Идёт загрузка или уже игра?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Загрузка (79%)",
+   "objects": "",
+   "vlm": "Тёмный экран с логотипом игры и полосой прогресса внизу, 60%."
+  },
+  "expect": [
+   [
+    "загруз"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "screen-05",
+  "category": "screen",
+  "trap": false,
+  "question": "Сколько людей видно в кадре?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Камера стримера (70%)",
+   "objects": "person: 2 в кадре, 2 за сессию",
+   "vlm": "Два человека сидят за столом перед камерой."
+  },
+  "expect": [
+   [
+    "два",
+    "2",
+    "двое"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "speech-01",
+  "category": "speech",
+  "trap": false,
+  "question": "Что сейчас сказал стример?",
+  "context": {
+   "channel": "",
+   "speech": "Ребята, сейчас заходим на точку Б через окно",
+   "speech_history": [
+    "Так, у нас эко раунд",
+    "Покупаем только пистолеты"
+   ],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "точк",
+    "Б"
+   ],
+   [
+    "окн"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "speech-02",
+  "category": "speech",
+  "trap": false,
+  "question": "О чём стример говорил последние минуты?",
+  "context": {
+   "channel": "",
+   "speech": "Короче, донат от Миши, спасибо большое",
+   "speech_history": [
+    "Сегодня проходим вторую главу",
+    "Босс тут сложный, придётся фармить",
+    "Короче, донат от Миши, спасибо большое"
+   ],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "глав"
+   ],
+   [
+    "босс",
+    "фарм"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "speech-03",
+  "category": "speech",
+  "trap": false,
+  "question": "Стример что-нибудь говорил про донаты?",
+  "context": {
+   "channel": "",
+   "speech": "Спасибо Алексею за пятьсот рублей",
+   "speech_history": [
+    "Начинаем стрим",
+    "Спасибо Алексею за пятьсот рублей"
+   ],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "Алекс"
+   ],
+   [
+    "500",
+    "пятьсот"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "speech-04",
+  "category": "speech",
+  "trap": false,
+  "question": "Стример сейчас что-то говорит?",
+  "context": {
+   "channel": "",
+   "speech": "(Стример молчит или играет музыка)",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Заставка / перерыв (86%)",
+   "objects": "",
+   "vlm": "Экран с надписью «Скоро вернусь» на фоне анимированного пейзажа."
+  },
+  "expect": [
+   [
+    "молч",
+    "не говорит",
+    "музык",
+    "перерыв",
+    "нет речи",
+    "не слышно"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "speech-05",
+  "category": "speech",
+  "trap": false,
+  "question": "Какой план на сегодняшний стрим озвучил стример?",
+  "context": {
+   "channel": "",
+   "speech": "Сначала три катки в рейтинге, потом смотрим ваши клипы",
+   "speech_history": [
+    "Всем привет, начинаем"
+   ],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "три",
+    "3"
+   ],
+   [
+    "клип"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "chat-01",
+  "category": "chat",
+  "trap": false,
+  "question": "Что пишут в чате?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[20:01:05] nightwolf: ну это клатч",
+    "[20:01:06] Kate_99: ахахах что это было",
+    "[20:01:08] tolik: КЛИП",
+    "[20:01:09] nightwolf: лучший раунд за стрим"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.75,
+    "negative_ratio": 0.0,
+    "neutral_ratio": 0.25,
+    "total_messages": 4
+   },
+   "mood": "ХАЙП / ПОЗИТИВ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "клатч",
+    "клип",
+    "раунд"
+   ],
+   [
+    "nightwolf",
+    "Kate_99",
+    "tolik"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "chat-02",
+  "category": "chat",
+  "trap": false,
+  "question": "Кто больше всех пишет в чате?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[19:10:01] sanya: го",
+    "[19:10:03] sanya: ну давай",
+    "[19:10:05] lena: привет",
+    "[19:10:07] sanya: опять промах"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.25,
+    "negative_ratio": 0.25,
+    "neutral_ratio": 0.5,
+    "total_messages": 4
+   },
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "sanya"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "chat-03",
+  "category": "chat",
+  "trap": false,
+  "question": "Задают ли зрители вопросы стримеру?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[21:00:01] mark: какой у тебя прицел?",
+    "[21:00:04] ira: а сколько часов в игре?",
+    "[21:00:06] mark: го дуэль"
+   ],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "прицел"
+   ],
+   [
+    "час"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "chat-04",
+  "category": "chat",
+  "trap": false,
+  "question": "Что писал пользователь lena?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[18:00:01] lena: всем привет из Казани",
+    "[18:00:03] bob: hi",
+    "[18:00:09] lena: стример, поздравляю с 1000 фолловеров"
+   ],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "Казан"
+   ],
+   [
+    "1000",
+    "тысяч",
+    "фолловер"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "chat-05",
+  "category": "chat",
+  "trap": false,
+  "question": "Есть ли в чате спам или повторяющиеся сообщения?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[17:00:01] bot123: ЗАХОДИ НА САЙТ",
+    "[17:00:02] bot123: ЗАХОДИ НА САЙТ",
+    "[17:00:03] bot123: ЗАХОДИ НА САЙТ",
+    "[17:00:05] alex: модеры где"
+   ],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "bot123",
+    "повтор",
+    "спам",
+    "одно и то же"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "mood-01",
+  "category": "mood",
+  "trap": false,
+  "question": "Какое настроение в чате?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[20:01:05] nightwolf: ну это клатч",
+    "[20:01:06] Kate_99: ахахах что это было",
+    "[20:01:08] tolik: КЛИП",
+    "[20:01:09] nightwolf: лучший раунд за стрим"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.75,
+    "negative_ratio": 0.0,
+    "neutral_ratio": 0.25,
+    "total_messages": 4
+   },
+   "mood": "ХАЙП / ПОЗИТИВ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "позитив",
+    "радост",
+    "хайп",
+    "восторг",
+    "весел"
+   ]
+  ],
+  "forbid": [
+   "негатив(ное|но) настроен"
+  ]
+ },
+ {
+  "id": "mood-02",
+  "category": "mood",
+  "trap": false,
+  "question": "Зрители недовольны?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[22:00:01] max: опять слил",
+    "[22:00:02] dan: скучно",
+    "[22:00:04] max: верните деньги",
+    "[22:00:05] pp: худший стрим"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.0,
+    "negative_ratio": 0.75,
+    "neutral_ratio": 0.25,
+    "total_messages": 4
+   },
+   "mood": "ТОКСИЧНО / НЕГАТИВ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "да",
+    "недовол",
+    "негатив",
+    "раздраж"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "mood-03",
+  "category": "mood",
+  "trap": false,
+  "question": "Какая доля позитивных сообщений в чате?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": {
+    "positive_ratio": 0.4,
+    "negative_ratio": 0.3,
+    "neutral_ratio": 0.3,
+    "total_messages": 20
+   },
+   "mood": "СБАЛАНСИРОВАННОЕ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "40"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "mood-04",
+  "category": "mood",
+  "trap": false,
+  "question": "Чат спокойный или бурно реагирует?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[16:00:01] a: привет",
+    "[16:00:30] b: как дела"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.0,
+    "negative_ratio": 0.0,
+    "neutral_ratio": 1.0,
+    "total_messages": 2
+   },
+   "mood": "СБАЛАНСИРОВАННОЕ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [
+   [
+    "спокой",
+    "тих",
+    "нейтрал",
+    "мало"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "combo-01",
+  "category": "combined",
+  "trap": false,
+  "question": "Как чат реагирует на то, что происходит в игре?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[20:10:01] q: давай давай",
+    "[20:10:02] w: не вывезет",
+    "[20:10:03] e: верим"
+   ],
+   "chat_stats": {
+    "positive_ratio": 0.67,
+    "negative_ratio": 0.33,
+    "neutral_ratio": 0.0,
+    "total_messages": 3
+   },
+   "mood": "СБАЛАНСИРОВАННОЕ",
+   "scene": "Игровой процесс (90%)",
+   "objects": "",
+   "vlm": "Финальный раунд, у команды стримера остался один игрок против троих."
+  },
+  "expect": [
+   [
+    "один",
+    "1"
+   ],
+   [
+    "болеют",
+    "поддерж",
+    "верят",
+    "давай",
+    "сомнева"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "combo-02",
+  "category": "combined",
+  "trap": false,
+  "question": "Совпадает ли то, что говорит стример, с происходящим на экране?",
+  "context": {
+   "channel": "",
+   "speech": "Сейчас открываем кейс",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Меню игры (82%)",
+   "objects": "",
+   "vlm": "Открыто меню инвентаря с кнопкой «Открыть кейс»."
+  },
+  "expect": [
+   [
+    "да",
+    "совпада",
+    "соответств"
+   ],
+   [
+    "кейс",
+    "меню",
+    "инвентар"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "combo-03",
+  "category": "combined",
+  "trap": false,
+  "question": "Коротко перескажи, что происходит на стриме.",
+  "context": {
+   "channel": "speedrun_ru",
+   "speech": "Если сейчас пройду этот прыжок, будет новый рекорд",
+   "speech_history": [],
+   "chat": [
+    "[15:00:01] z: PogChamp",
+    "[15:00:02] x: рекорд будет"
+   ],
+   "chat_stats": null,
+   "mood": "ХАЙП / ПОЗИТИВ",
+   "scene": "Игровой процесс (93%)",
+   "objects": "",
+   "vlm": "Платформер, таймер спидрана в углу показывает 12:41."
+  },
+  "expect": [
+   [
+    "рекорд"
+   ],
+   [
+    "12:41",
+    "спидран",
+    "платформер",
+    "таймер"
+   ]
+  ],
+  "forbid": []
+ },
+ {
+  "id": "trap-01",
+  "category": "trap",
+  "trap": true,
+  "question": "Как зовут стримера?",
+  "context": {
+   "channel": "",
+   "speech": "Погнали дальше",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Игровой процесс (85%)",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [],
+  "forbid": [
+   "зовут [А-ЯA-Z]"
+  ]
+ },
+ {
+  "id": "trap-02",
+  "category": "trap",
+  "trap": true,
+  "question": "Сколько зрителей сейчас смотрят стрим?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[20:01:05] nightwolf: ну это клатч",
+    "[20:01:06] Kate_99: ахахах что это было",
+    "[20:01:08] tolik: КЛИП",
+    "[20:01:09] nightwolf: лучший раунд за стрим"
+   ],
+   "chat_stats": null,
+   "mood": "ХАЙП / ПОЗИТИВ",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [],
+  "forbid": [
+   "\\d+\\s*(зрител|человек)"
+  ]
+ },
+ {
+  "id": "trap-03",
+  "category": "trap",
+  "trap": true,
+  "question": "Какой у стримера ранг в игре?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Игровой процесс (90%)",
+   "objects": "",
+   "vlm": "Шутер, игрок на карте Inferno, счёт 3:5."
+  },
+  "expect": [],
+  "forbid": [
+   "(глобал|золот|серебр|алмаз|плат)"
+  ]
+ },
+ {
+  "id": "trap-04",
+  "category": "trap",
+  "trap": true,
+  "question": "В какую игру будет играть стример после этой?",
+  "context": {
+   "channel": "",
+   "speech": "Ещё пару каток и посмотрим",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Игровой процесс (80%)",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [],
+  "forbid": []
+ },
+ {
+  "id": "trap-05",
+  "category": "trap",
+  "trap": true,
+  "question": "Что стример сказал про погоду?",
+  "context": {
+   "channel": "",
+   "speech": "Так, закупаемся",
+   "speech_history": [
+    "Всем привет",
+    "Сегодня ранговые"
+   ],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [],
+  "forbid": [
+   "(дожд|солнц|снег|жар|холод)"
+  ]
+ },
+ {
+  "id": "trap-06",
+  "category": "trap",
+  "trap": true,
+  "question": "Какой счёт в матче?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Камера стримера (88%)",
+   "objects": "",
+   "vlm": "Человек в кадре пьёт чай, игрового интерфейса не видно."
+  },
+  "expect": [],
+  "forbid": [
+   "\\d+\\s*:\\s*\\d+"
+  ]
+ },
+ {
+  "id": "trap-07",
+  "category": "trap",
+  "trap": true,
+  "question": "Что написал пользователь nightwolf про донаты?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [
+    "[20:01:05] nightwolf: ну это клатч",
+    "[20:01:06] Kate_99: ахахах что это было",
+    "[20:01:08] tolik: КЛИП",
+    "[20:01:09] nightwolf: лучший раунд за стрим"
+   ],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "",
+   "objects": "",
+   "vlm": ""
+  },
+  "expect": [],
+  "forbid": []
+ },
+ {
+  "id": "trap-08",
+  "category": "trap",
+  "trap": true,
+  "question": "Сколько стримеру лет?",
+  "context": {
+   "channel": "",
+   "speech": "",
+   "speech_history": [],
+   "chat": [],
+   "chat_stats": null,
+   "mood": "",
+   "scene": "Камера стримера (90%)",
+   "objects": "person: 1 в кадре, 1 за сессию",
+   "vlm": "Молодой человек в наушниках говорит в микрофон."
+  },
+  "expect": [],
+  "forbid": [
+   "\\d+\\s*(лет|год)"
+  ]
+ }
+]

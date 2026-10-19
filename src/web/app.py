@@ -38,9 +38,9 @@ def create_web_app() -> gr.Blocks:
             create_text_tab()
             create_audio_tab()
             create_image_tab()
-            create_vlm_tab()
             create_video_tab()
             create_llm_tab()
+            create_vlm_tab()
             create_twitch_tab()
 
     return demo

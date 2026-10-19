@@ -73,12 +73,12 @@ class BatchSentimentResult(SubscriptableModel):
 
 
 class AudioTranscriptionResult(SubscriptableModel):
-    """Speech-to-text inference result from Faster-Whisper."""
+    """Speech-to-text inference result from Whisper."""
 
-    transcription: str
+    transcription: str = Field(..., description="Text after hallucination filtering")
     language: str
     inference_time_s: float
-    cleaned_text: Optional[str] = None
+    raw_transcription: str = Field(default="", description="Model output before filtering")
 
 
 class ClassificationItem(SubscriptableModel):
@@ -105,6 +105,7 @@ class DetectedObject(SubscriptableModel):
     class_name: str
     confidence: float
     box: List[Union[int, float]] = Field(default_factory=list)
+    track_id: Optional[int] = None
 
 
 class VideoDetectionResult(SubscriptableModel):
@@ -113,6 +114,9 @@ class VideoDetectionResult(SubscriptableModel):
     detected_objects: List[DetectedObject] = Field(default_factory=list)
     annotated_frame: Any = None
     latency_ms: float = 0.0
+    unique_objects: Dict[str, int] = Field(
+        default_factory=dict, description="Distinct track ids per class since tracking reset"
+    )
 
 
 class LLMReplyResult(SubscriptableModel):
@@ -125,6 +129,10 @@ class LLMReplyResult(SubscriptableModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     speed_tps: float = 0.0
+    load_ms: float = Field(default=0.0, description="Model load time reported by Ollama")
+    prompt_eval_ms: float = Field(
+        default=0.0, description="Prompt processing time; with load_ms ~ TTFT"
+    )
 
 
 class MultimodalCycleResult(SubscriptableModel):

@@ -16,13 +16,11 @@ services:
       - METRICS_PORT=${WEB_METRICS_PORT:-8001}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
-      - VISION_BACKEND=${VISION_BACKEND:-ollama}
       - OLLAMA_CONTEXT=${OLLAMA_CONTEXT:-4096}
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
       - WHISPER_MODEL=${WHISPER_MODEL:-openai/whisper-small}
       - NLP_MODEL=${NLP_MODEL:-cointegrated/rubert-tiny2-cedr-emotion-detection}
-      - IMAGE_MODEL=${IMAGE_MODEL:-Salesforce/blip-image-captioning-large}
-      - VLM_MODEL=${VLM_MODEL:-Qwen/Qwen2-VL-2B-Instruct}
+      - IMAGE_MODEL=${IMAGE_MODEL:-openai/clip-vit-base-patch32}
       - YOLO_MODEL=${YOLO_MODEL:-yolo26s.pt}
       - API_HOST=${API_HOST:-0.0.0.0}
       - API_PORT=${API_PORT:-8000}
@@ -55,13 +53,11 @@ services:
       - API_PORT=${API_PORT:-8000}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
-      - VISION_BACKEND=${VISION_BACKEND:-ollama}
       - OLLAMA_CONTEXT=${OLLAMA_CONTEXT:-4096}
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
       - WHISPER_MODEL=${WHISPER_MODEL:-openai/whisper-small}
       - NLP_MODEL=${NLP_MODEL:-cointegrated/rubert-tiny2-cedr-emotion-detection}
-      - IMAGE_MODEL=${IMAGE_MODEL:-Salesforce/blip-image-captioning-large}
-      - VLM_MODEL=${VLM_MODEL:-Qwen/Qwen2-VL-2B-Instruct}
+      - IMAGE_MODEL=${IMAGE_MODEL:-openai/clip-vit-base-patch32}
       - YOLO_MODEL=${YOLO_MODEL:-yolo26s.pt}
       - DEFAULT_TWITCH_CHANNEL=${DEFAULT_TWITCH_CHANNEL:-}
     volumes:

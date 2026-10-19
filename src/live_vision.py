@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Callable, Optional
 
-from src.vision_backend import create_vision_classifier
+from src.vision_backend import OllamaVisionClassifier
 from src.metrics import record_model_latency, record_processing_error, VLM_FRAME_TIMESTAMP
 from src.monitoring.decorators import safe_telemetry_dispatch
 
@@ -25,7 +25,7 @@ class BackgroundVLMAnalyzer:
         interval_seconds: float = 20,
         max_age_seconds: float = 60,
     ):
-        self.model_factory = model_factory or create_vision_classifier
+        self.model_factory = model_factory or OllamaVisionClassifier
         self.interval_seconds = max(0, interval_seconds)
         self.max_age_seconds = max_age_seconds
         self._lock = threading.Lock()

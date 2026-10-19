@@ -12,7 +12,6 @@ from src.connectors.twitch_chat import TwitchChatListener
 from src.connectors.twitch_video import TwitchStreamSource
 from src.bot_pipeline import StreamMultimodalPipeline
 from src.live_vision import BackgroundVLMAnalyzer
-from src.core.config import settings
 
 
 class LiveTwitchObserver:
@@ -29,7 +28,6 @@ class LiveTwitchObserver:
         self.chat_listener = TwitchChatListener(channel)
         self.stream_source = TwitchStreamSource(channel, quality)
         self.pipeline = pipeline or StreamMultimodalPipeline()
-        self.companion = self.pipeline
 
     def run_live(
         self,
@@ -100,7 +98,6 @@ class LiveTwitchObserver:
                     image_or_frame=frame,
                     chat_messages=chat_messages,
                     vlm_description=vlm_analyzer.get_latest(),
-                    use_cached_vision=settings.models.vision_backend == "ollama",
                 )
 
                 # 5. Display HUD on Video Frame

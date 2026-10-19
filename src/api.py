@@ -1,15 +1,17 @@
 """API Service: FastAPI interface for experiments with pretrained models.
 
-Provides REST endpoints for text sentiment, image classification,
-object detection, and LLM reactions.
+The text emotion model is the primary API of the report (section 9.3); the scene, detection,
+frame-question and reaction routes expose the other models for experiments.
 """
 
-from typing import List, Optional
-import os
+import io
 import time
-import shutil
-import tempfile
+from contextlib import asynccontextmanager
+from typing import List, Optional
+
+import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from src.core.config import settings
@@ -20,8 +22,8 @@ from src.core.schemas import (
     LLMReplyResult,
 )
 from src.nlp_sentiment import ChatSentimentAnalyzer
-from src.image_classify import StreamImageClassifier
-from src.vision_backend import create_vision_classifier
+from src.scene_classify import SceneClassifier
+from src.vision_backend import OllamaVisionClassifier
 from src.video_live import LiveStreamVideoDetector
 from src.llm_brain import LocalLLMBrain
 from src.monitoring.decorators import safe_telemetry_dispatch
@@ -36,15 +38,38 @@ from src.metrics import (
     record_bot_reply,
 )
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+# Model references populated at startup.
+nlp_model: Optional[ChatSentimentAnalyzer] = None
+scene_model: Optional[SceneClassifier] = None
+vision_model: Optional[OllamaVisionClassifier] = None
+video_model: Optional[LiveStreamVideoDetector] = None
+llm_model: Optional[LocalLLMBrain] = None
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global nlp_model, scene_model, vision_model, video_model, llm_model
+    print("[API] Initializing models on startup...")
+    nlp_model = ChatSentimentAnalyzer()
+    scene_model = SceneClassifier()
+    vision_model = OllamaVisionClassifier()
+    video_model = LiveStreamVideoDetector()
+    llm_model = LocalLLMBrain()
+    print("[API] Model instances initialized; Ollama inference is requested separately.")
+    yield
+
+
 app = FastAPI(
     title="llm-lab",
     description=(
-        "API для изучения возможностей готовых моделей: анализ тональности текста, "
-        "описание изображений, вопросы о кадре и детекция объектов. "
-        "Дополнительно доступна генерация реакции LLM по объединённому контексту. "
+        "API к готовым моделям: эмоции и тональность текста (основной маршрут), "
+        "тип сцены кадра (CLIP), детекция объектов (YOLO), вопрос о кадре и реакция LLM. "
         "Метрики доступны в /metrics."
     ),
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -77,39 +102,38 @@ async def prometheus_metrics_middleware(request: Request, call_next):
             )
 
 
-# Model references populated at startup; vlm_model is initialized on first request.
-nlp_model: Optional[ChatSentimentAnalyzer] = None
-image_model: Optional[StreamImageClassifier] = None
-vlm_model: Optional[StreamImageClassifier] = None
-video_model: Optional[LiveStreamVideoDetector] = None
-llm_model: Optional[LocalLLMBrain] = None
-
-
-@app.on_event("startup")
-def startup_event():
-    global nlp_model, image_model, video_model, llm_model
-    print("[API] Initializing models on startup...")
-    nlp_model = ChatSentimentAnalyzer()
-    image_model = create_vision_classifier()
-    video_model = LiveStreamVideoDetector()
-    llm_model = LocalLLMBrain()
-    print("[API] Model instances initialized; Ollama inference is requested separately.")
-
-
 class ChatBatchRequest(BaseModel):
     messages: List[str] = Field(
-        ..., example=["Невероятный клатч!", "Худшая игра за сегодня", "Вперед, тащим дальше!"]
+        ...,
+        min_length=1,
+        max_length=500,
+        examples=[["Невероятный клатч!", "Худшая игра за сегодня", "Вперед, тащим дальше!"]],
     )
 
 
 class SingleChatRequest(BaseModel):
-    text: str = Field(..., example="Это лучший стрим за последнее время, отличная игра!")
+    text: str = Field(
+        ..., min_length=1, examples=["Это лучший стрим за последнее время, отличная игра!"]
+    )
 
 
 class ReactionRequest(BaseModel):
-    streamer_speech: str = Field(..., example="Ребята, заходим на точку Б или держим позиции?")
-    chat_mood: str = Field(..., example="ХАЙП / ПОЗИТИВ")
-    visual_context: str = Field(..., example="Игрок целится на плент, осталось двое противников")
+    streamer_speech: str = Field(..., examples=["Ребята, заходим на точку Б или держим позиции?"])
+    chat_mood: str = Field(..., examples=["ХАЙП / ПОЗИТИВ"])
+    visual_context: str = Field(..., examples=["Игрок целится на плент, осталось двое противников"])
+
+
+def _read_image(file: UploadFile) -> Image.Image:
+    """Decodes an uploaded image in memory; rejects oversized or non-image files with 4xx."""
+    data = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image is larger than 10 MB")
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+        return image.convert("RGB")
+    except Exception:  # PIL raises several types for truncated or non-image data.
+        raise HTTPException(status_code=400, detail="File is not a readable image")
 
 
 @app.get("/metrics")
@@ -127,7 +151,7 @@ def root():
             "/metrics",
             "/api/text/sentiment",
             "/api/text/batch-sentiment",
-            "/api/image/classify",
+            "/api/image/scene",
             "/api/image/vlm",
             "/api/video/detect-frame",
             "/api/llm/generate-reaction",
@@ -159,87 +183,48 @@ def analyze_chat_batch(req: ChatBatchRequest):
     return res
 
 
-@app.post("/api/image/classify", response_model=ImageClassificationResult)
-async def classify_stream_image(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
-    """Analyze an uploaded image with the configured vision backend and optional prompt."""
-    if not image_model:
-        raise HTTPException(status_code=503, detail="Image model not initialized")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
-    try:
-        result = image_model.classify_image(tmp_path, prompt=prompt)
-        safe_telemetry_dispatch(
-            record_model_latency, "image_classify", result.inference_latency_ms / 1000.0
-        )
-        return result
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+@app.post("/api/image/scene", response_model=ImageClassificationResult)
+def classify_scene(file: UploadFile = File(...)):
+    """Classify the scene type of a frame with CLIP zero-shot classification."""
+    if not scene_model:
+        raise HTTPException(status_code=503, detail="Scene model not initialized")
+    result = scene_model.classify_image(_read_image(file))
+    safe_telemetry_dispatch(
+        record_model_latency, "image_scene", result.inference_latency_ms / 1000.0
+    )
+    return result
 
 
 @app.post("/api/image/vlm", response_model=ImageClassificationResult)
-async def vlm_analyze_image(
-    file: UploadFile = File(...),
-    prompt: Optional[str] = Form(None),
-):
-    """Ask the configured vision model about a frame, including scene or interface text."""
-    global vlm_model
-    if vlm_model is None:
-        try:
-            vlm_model = create_vision_classifier()
-        except Exception as e:
-            print(f"[API] Error loading VLM: {e}, falling back to image_model")
-            vlm_model = image_model
-
-    active_vlm = vlm_model or image_model
-    if not active_vlm:
-        raise HTTPException(status_code=503, detail="Image/VLM model not initialized")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
+def vlm_analyze_image(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
+    """Ask the local LLM about a frame, including scene or interface text."""
+    if not vision_model:
+        raise HTTPException(status_code=503, detail="Vision model not initialized")
+    image = _read_image(file)
     try:
-        result = active_vlm.classify_image(tmp_path, prompt=prompt)
-        safe_telemetry_dispatch(
-            record_model_latency, "image_vlm", result.inference_latency_ms / 1000.0
-        )
-        return result
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        result = vision_model.classify_image(image, prompt=prompt)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Ollama vision request failed: {exc}")
+    safe_telemetry_dispatch(record_model_latency, "image_vlm", result.inference_latency_ms / 1000.0)
+    return result
 
 
 @app.post("/api/video/detect-frame")
-async def detect_frame_objects(file: UploadFile = File(...)):
+def detect_frame_objects(file: UploadFile = File(...)):
     """Detect objects in a single image using the configured YOLO model."""
     if not video_model:
         raise HTTPException(status_code=503, detail="Video model not initialized")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
-    try:
-        import cv2
-
-        frame = cv2.imread(tmp_path)
-        result = video_model.process_frame(frame)
-        safe_telemetry_dispatch(record_model_latency, "video_detector", result.latency_ms / 1000.0)
-        safe_telemetry_dispatch(record_detected_objects, result.detected_objects)
-        return {
-            "detected_objects": [
-                {"class": o.class_name, "confidence": o.confidence, "box": o.box}
-                for o in result.detected_objects
-            ],
-            "latency_ms": result.latency_ms,
-        }
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    frame = np.asarray(_read_image(file))[:, :, ::-1].copy()  # RGB -> BGR, as from OpenCV.
+    result = video_model.process_frame(frame, annotate=False)
+    safe_telemetry_dispatch(record_model_latency, "video_yolo", result.latency_ms / 1000.0)
+    safe_telemetry_dispatch(record_detected_objects, result.detected_objects)
+    return {
+        "detected_objects": [
+            {"class": o.class_name, "confidence": o.confidence, "box": o.box}
+            for o in result.detected_objects
+        ],
+        "latency_ms": result.latency_ms,
+    }
 
 
 @app.post("/api/llm/generate-reaction", response_model=LLMReplyResult)
